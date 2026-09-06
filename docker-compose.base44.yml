@@ -1,0 +1,23 @@
+services:
+  app:
+    image: oven/bun:1
+    working_dir: /app
+    volumes:
+      - ./:/app
+      # Keep installed deps out of the bind mount so host node_modules (if any) doesn't clobber
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: sh -c "bun install && bun run dev"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s

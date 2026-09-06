@@ -1,0 +1,12 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/api/health",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "GEMINI_API_KEY",
+      "description": "Google Gemini AI API key (from Google AI Studio at https://aistudio.google.com/apikey). Powers the AI study assistant features (summarize notes, flashcards, quizzes, concept explainer, study plan). The app runs without it using built-in fallbacks, but AI responses will be mock data until provided.",
+      "requiredAtBoot": false
+    }
+  ]
+}
