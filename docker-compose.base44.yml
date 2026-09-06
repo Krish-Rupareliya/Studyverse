@@ -14,7 +14,6 @@ services:
       - PORT=3000
     env_file:
       - ./.env.base44-defaults
-      - /run/base44/app.env
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 5s

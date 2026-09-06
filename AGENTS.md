@@ -17,7 +17,7 @@ docker compose -f docker-compose.base44.yml up -d
 - **WebSocket** runs on the same port 3000 (upgraded from the Express http server). Real-time sync (rooms, presence, DMs, whiteboard) works over same-origin ws.
 
 ## Secrets
-- `GEMINI_API_KEY` (optional): Google Gemini API key for AI study features (summarize notes, flashcards, quizzes, concept explainer, study plan). The app **boots and works without it** — server-side code returns mock/fallback data when the key is absent. Get it from https://aistudio.google.com/apikey. Delivered via `/run/base44/app.env`.
+- None required. The Gemini AI dependency has been removed — AI endpoints return built-in fallback/mock responses. All real-time collaboration features (rooms, chat, whiteboard, presence, DMs) work without any external service or API key.
 - `APP_URL`: set to `http://localhost:3000` as a default; not used by frontend code (all API calls are relative `/api/...`).
 
 ## Verifying it works
