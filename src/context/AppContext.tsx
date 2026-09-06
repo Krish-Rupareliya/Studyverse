@@ -36,15 +36,15 @@ import { realtimeSync, RealtimeMessage } from '../services/realtimeSyncService';
 
 // Storage keys
 const STORAGE_KEYS = {
-  FRIENDSHIPS: 'studyspace_friendships_v1',
-  ROOMS: 'studyspace_rooms_v1',
-  MESSAGES: 'studyspace_messages_v1',
-  NOTIFICATIONS: 'studyspace_notifications_v1',
-  TASKS: 'studyspace_tasks_v1',
-  GOALS: 'studyspace_goals_v1',
-  HABITS: 'studyspace_habits_v1',
-  SESSIONS: 'studyspace_sessions_v1',
-  FEED: 'studyspace_feed_v1',
+  FRIENDSHIPS: 'studyspace_friendships_v2',
+  ROOMS: 'studyspace_rooms_v2',
+  MESSAGES: 'studyspace_messages_v2',
+  NOTIFICATIONS: 'studyspace_notifications_v2',
+  TASKS: 'studyspace_tasks_v2',
+  GOALS: 'studyspace_goals_v2',
+  HABITS: 'studyspace_habits_v2',
+  SESSIONS: 'studyspace_sessions_v2',
+  FEED: 'studyspace_feed_v2',
 };
 
 // Play short pleasant audio chimes via Web Audio API
@@ -340,21 +340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_NOTIFICATIONS;
   });
 
-  const [roomMessages, setRoomMessages] = useState<{ [roomId: string]: RoomChatMessage[] }>({
-    room_cs61a: [
-      {
-        id: 'rm_1',
-        roomId: 'room_cs61a',
-        senderId: 'user_alex',
-        senderName: 'Alex Rivera',
-        senderUsername: 'alex_study',
-        senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        content: 'Welcome everyone! Focus round is starting in 2 mins. Feel free to ask questions in chat anytime.',
-        timestamp: Date.now() - 1000 * 60 * 20,
-        type: 'chat',
-      },
-    ],
-  });
+  const [roomMessages, setRoomMessages] = useState<{ [roomId: string]: RoomChatMessage[] }>({});
 
   const [tasks, setTasks] = useState<TaskItem[]>(() => {
     try {
@@ -655,7 +641,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             messages,
             notifications,
             feed: activityFeed,
-            [key.replace('studyspace_', '').replace('_v1', '')]: data,
+            [key.replace('studyspace_', '').replace('_v2', '')]: data,
           },
         });
         channel.close();

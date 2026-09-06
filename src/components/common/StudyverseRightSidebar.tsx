@@ -291,7 +291,7 @@ export const StudyverseRightSidebar: React.FC<StudyverseRightSidebarProps> = ({
       {/* Floating Bottom Purple Chat Action Bubble */}
       <div className="pt-4 flex justify-end">
         <button
-          onClick={() => onNavigateDirectMessage(friends[0]?.id || 'user_bella')}
+          onClick={() => friends[0] && onNavigateDirectMessage(friends[0].id)}
           className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#7C3AED] to-[#A78BFA] text-white flex items-center justify-center shadow-lg shadow-purple-900/50 hover:scale-110 transition transform cursor-pointer"
           title="Open Quick Chat"
         >

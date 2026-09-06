@@ -3,7 +3,7 @@ import { UserProfile } from '../types';
 import { INITIAL_USERS } from '../data/initialData';
 
 interface AuthContextType {
-  currentUser: UserProfile;
+  currentUser: UserProfile | undefined;
   users: UserProfile[];
   switchUser: (userId: string) => void;
   updateCurrentUserProfile: (updates: Partial<UserProfile>) => void;
@@ -14,8 +14,8 @@ interface AuthContextType {
   allUsers: UserProfile[];
 }
 
-const USERS_STORAGE_KEY = 'studyspace_all_users_v1';
-const CURRENT_USER_ID_KEY = 'studyspace_current_user_id_v1';
+const USERS_STORAGE_KEY = 'studyspace_all_users_v2';
+const CURRENT_USER_ID_KEY = 'studyspace_current_user_id_v2';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return saved;
       }
     } catch {}
-    return 'user_alex'; // Default to Test User A
+    return '';
   });
 
   // Sync users to storage
@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
   }, [currentUserId]);
 
-  const currentUser = users.find((u) => u.id === currentUserId) || users[0] || INITIAL_USERS[0];
+  const currentUser = users.find((u) => u.id === currentUserId) || users[0];
 
   const switchUser = (userId: string) => {
     if (users.some((u) => u.id === userId)) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
-import { TwoUserTesterBanner } from './components/common/TwoUserTesterBanner';
+import { OnboardingView } from './components/onboarding/OnboardingView';
 import { StudyverseSidebar, AppView } from './components/common/StudyverseSidebar';
 import { StudyverseMobileBottomNav } from './components/common/StudyverseMobileBottomNav';
 import { StudyverseRightSidebar } from './components/common/StudyverseRightSidebar';
@@ -19,12 +19,18 @@ import { GlobalSearchModal } from './components/search/GlobalSearchModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { StudyRoom } from './types';
 
+const AppGate: React.FC = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <OnboardingView />;
+  return <MainAppContent />;
+};
+
 const MainAppContent: React.FC = () => {
   const { currentUser } = useAuth();
   const { rooms, activeRoom, joinRoom } = useApp();
 
   const [currentView, setCurrentView] = useState<AppView>('home');
-  const [selectedProfileUsername, setSelectedProfileUsername] = useState<string>(currentUser?.username || 'alex');
+  const [selectedProfileUsername, setSelectedProfileUsername] = useState<string>(currentUser?.username || '');
   const [selectedDmRecipientId, setSelectedDmRecipientId] = useState<string | null>(null);
   const [autoStartDmCall, setAutoStartDmCall] = useState<boolean>(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -104,7 +110,6 @@ const MainAppContent: React.FC = () => {
 
     return (
       <div className="min-h-screen bg-[#0D0B1D] text-slate-100 flex flex-col font-sans select-none">
-        <TwoUserTesterBanner />
         <ActiveStudyRoomView
           onLeaveRoom={() => setCurrentView('rooms')}
           onNavigateProfile={handleOpenProfile}
@@ -117,9 +122,6 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0D0B1D] text-slate-100 flex flex-col font-sans selection:bg-[#6D28D9] selection:text-white">
-      {/* Interactive Two-User Verification Banner */}
-      <TwoUserTesterBanner />
-
       {/* Main Studyverse Layout: Left Navigation Rail + Central View + Right Widget Sidebar */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Vertical Navigation Rail */}
@@ -244,7 +246,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <MainAppContent />
+        <AppGate />
       </AppProvider>
     </AuthProvider>
   );
