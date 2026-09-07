@@ -18,9 +18,23 @@ import { ProfileView } from './components/profile/ProfileView';
 import { GlobalSearchModal } from './components/search/GlobalSearchModal';
 import { ToastContainer } from './components/common/ToastContainer';
 import { StudyRoom } from './types';
+import { GraduationCap } from 'lucide-react';
 
 const AppGate: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
+  const { loading: appLoading } = useApp();
+  if (authLoading || appLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D0B1D] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#6D28D9] to-[#8B5CF6] flex items-center justify-center mb-4 mx-auto animate-pulse">
+            <GraduationCap className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-sm text-[#8E8AAB]">Loading StudySpace...</p>
+        </div>
+      </div>
+    );
+  }
   if (!currentUser) return <OnboardingView />;
   return <MainAppContent />;
 };
