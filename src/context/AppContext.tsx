@@ -20,32 +20,11 @@ import {
   ActivityFeedItem,
   ToastMessage,
 } from '../types';
-import {
-  INITIAL_FRIENDSHIPS,
-  INITIAL_ROOMS,
-  INITIAL_MESSAGES,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_TASKS,
-  INITIAL_GOALS,
-  INITIAL_HABITS,
-  INITIAL_FEED,
-} from '../data/initialData';
 import { useAuth } from './AuthContext';
 import { mediaService } from '../services/mediaService';
 import { realtimeSync, RealtimeMessage } from '../services/realtimeSyncService';
-
-// Storage keys
-const STORAGE_KEYS = {
-  FRIENDSHIPS: 'studyspace_friendships_v1',
-  ROOMS: 'studyspace_rooms_v1',
-  MESSAGES: 'studyspace_messages_v1',
-  NOTIFICATIONS: 'studyspace_notifications_v1',
-  TASKS: 'studyspace_tasks_v1',
-  GOALS: 'studyspace_goals_v1',
-  HABITS: 'studyspace_habits_v1',
-  SESSIONS: 'studyspace_sessions_v1',
-  FEED: 'studyspace_feed_v1',
-};
+import { dataService } from '../services/base44DataService';
+import { isBase44Enabled } from '../api/base44Client';
 
 // Play short pleasant audio chimes via Web Audio API
 export function playChime(type: 'notification' | 'timer_complete' | 'join' | 'leave' | 'chat') {
@@ -230,6 +209,9 @@ interface AppContextType {
   toasts: ToastMessage[];
   showToast: (title: string, description?: string, type?: 'success' | 'info' | 'warning' | 'error', duration?: number) => void;
   removeToast: (id: string) => void;
+
+  // Loading state
+  loading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -260,22 +242,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [removeToast]
   );
 
-  // State initialization with localStorage persistence
-  const [friendships, setFriendships] = useState<FriendRelationship[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.FRIENDSHIPS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_FRIENDSHIPS;
-  });
-
-  const [rooms, setRooms] = useState<StudyRoom[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.ROOMS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_ROOMS;
-  });
+  // State initialization (loaded async from Base44 or localStorage)
+  const [friendships, setFriendships] = useState<FriendRelationship[]>([]);
+  const [rooms, setRooms] = useState<StudyRoom[]>([]);
 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
@@ -324,77 +293,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const [messages, setMessages] = useState<DirectMessage[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.MESSAGES);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_MESSAGES;
-  });
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [roomMessages, setRoomMessages] = useState<{ [roomId: string]: RoomChatMessage[] }>({});
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [goals, setGoals] = useState<StudyGoal[]>([]);
+  const [habits, setHabits] = useState<HabitItem[]>([]);
+  const [studySessions, setStudySessions] = useState<StudySessionRecord[]>([]);
+  const [activityFeed, setActivityFeed] = useState<ActivityFeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_NOTIFICATIONS;
-  });
+  // Load all data from Base44 (or localStorage fallback) on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [
+          fetchedFriendships,
+          fetchedRooms,
+          fetchedMessages,
+          fetchedNotifications,
+          fetchedTasks,
+          fetchedGoals,
+          fetchedHabits,
+          fetchedSessions,
+          fetchedFeed,
+        ] = await Promise.all([
+          dataService.list<FriendRelationship>('Friendship'),
+          dataService.list<StudyRoom>('StudyRoom'),
+          dataService.list<DirectMessage>('DirectMessage'),
+          dataService.list<AppNotification>('Notification'),
+          dataService.list<TaskItem>('Task'),
+          dataService.list<StudyGoal>('Goal'),
+          dataService.list<HabitItem>('Habit'),
+          dataService.list<StudySessionRecord>('StudySession'),
+          dataService.list<ActivityFeedItem>('ActivityFeed'),
+        ]);
+        if (!mounted) return;
+        setFriendships(fetchedFriendships);
+        setRooms(fetchedRooms);
+        setMessages(fetchedMessages);
+        setNotifications(fetchedNotifications);
+        setTasks(fetchedTasks);
+        setGoals(fetchedGoals);
+        setHabits(fetchedHabits);
+        setStudySessions(fetchedSessions);
+        setActivityFeed(fetchedFeed);
+      } catch (e) {
+        console.error('Failed to load app data:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
-  const [roomMessages, setRoomMessages] = useState<{ [roomId: string]: RoomChatMessage[] }>({
-    room_cs61a: [
-      {
-        id: 'rm_1',
-        roomId: 'room_cs61a',
-        senderId: 'user_alex',
-        senderName: 'Alex Rivera',
-        senderUsername: 'alex_study',
-        senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        content: 'Welcome everyone! Focus round is starting in 2 mins. Feel free to ask questions in chat anytime.',
-        timestamp: Date.now() - 1000 * 60 * 20,
-        type: 'chat',
-      },
-    ],
-  });
+  // Base44 real-time subscriptions
+  useEffect(() => {
+    if (!isBase44Enabled()) return;
+    const unsubs: (() => void)[] = [];
 
-  const [tasks, setTasks] = useState<TaskItem[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.TASKS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_TASKS;
-  });
+    unsubs.push(dataService.subscribe<StudyRoom>('StudyRoom', (event) => {
+      if (event.type === 'create') setRooms(prev => prev.some(r => r.id === event.data.id) ? prev : [...prev, event.data]);
+      else if (event.type === 'update') setRooms(prev => prev.map(r => r.id === event.data.id ? { ...r, ...event.data } : r));
+      else if (event.type === 'delete') setRooms(prev => prev.filter(r => r.id !== event.id));
+    }));
 
-  const [goals, setGoals] = useState<StudyGoal[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.GOALS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_GOALS;
-  });
+    unsubs.push(dataService.subscribe<DirectMessage>('DirectMessage', (event) => {
+      if (event.type === 'create') setMessages(prev => prev.some(m => m.id === event.data.id) ? prev : [...prev, event.data]);
+      else if (event.type === 'update') setMessages(prev => prev.map(m => m.id === event.data.id ? { ...m, ...event.data } : m));
+      else if (event.type === 'delete') setMessages(prev => prev.filter(m => m.id !== event.id));
+    }));
 
-  const [habits, setHabits] = useState<HabitItem[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.HABITS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_HABITS;
-  });
+    unsubs.push(dataService.subscribe<FriendRelationship>('Friendship', (event) => {
+      if (event.type === 'create') setFriendships(prev => prev.some(f => f.id === event.data.id) ? prev : [...prev, event.data]);
+      else if (event.type === 'update') setFriendships(prev => prev.map(f => f.id === event.data.id ? { ...f, ...event.data } : f));
+      else if (event.type === 'delete') setFriendships(prev => prev.filter(f => f.id !== event.id));
+    }));
 
-  const [studySessions, setStudySessions] = useState<StudySessionRecord[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return [];
-  });
+    unsubs.push(dataService.subscribe<AppNotification>('Notification', (event) => {
+      if (event.type === 'create') setNotifications(prev => prev.some(n => n.id === event.data.id) ? prev : [event.data, ...prev]);
+      else if (event.type === 'update') setNotifications(prev => prev.map(n => n.id === event.data.id ? { ...n, ...event.data } : n));
+      else if (event.type === 'delete') setNotifications(prev => prev.filter(n => n.id !== event.id));
+    }));
 
-  const [activityFeed, setActivityFeed] = useState<ActivityFeedItem[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEYS.FEED);
-      if (s) return JSON.parse(s);
-    } catch {}
-    return INITIAL_FEED;
-  });
+    unsubs.push(dataService.subscribe<ActivityFeedItem>('ActivityFeed', (event) => {
+      if (event.type === 'create') setActivityFeed(prev => prev.some(a => a.id === event.data.id) ? prev : [event.data, ...prev]);
+      else if (event.type === 'update') setActivityFeed(prev => prev.map(a => a.id === event.data.id ? { ...a, ...event.data } : a));
+      else if (event.type === 'delete') setActivityFeed(prev => prev.filter(a => a.id !== event.id));
+    }));
+
+    return () => unsubs.forEach(u => u());
+  }, []);
 
   // Cross-Tab & WebSockets Real-time Listener
   useEffect(() => {
@@ -655,7 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             messages,
             notifications,
             feed: activityFeed,
-            [key.replace('studyspace_', '').replace('_v1', '')]: data,
+            [key.replace('studyspace_', '').replace('_v2', '')]: data,
           },
         });
         channel.close();
@@ -664,42 +654,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [friendships, rooms, messages, notifications, activityFeed]
   );
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FRIENDSHIPS, JSON.stringify(friendships));
-  }, [friendships]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ROOMS, JSON.stringify(rooms));
-  }, [rooms]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
-  }, [goals]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(habits));
-  }, [habits]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(studySessions));
-  }, [studySessions]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FEED, JSON.stringify(activityFeed));
-  }, [activityFeed]);
+  // Persist to backend (Base44 or localStorage fallback)
+  useEffect(() => { dataService.persist('Friendship', friendships); }, [friendships]);
+  useEffect(() => { dataService.persist('StudyRoom', rooms); }, [rooms]);
+  useEffect(() => { dataService.persist('DirectMessage', messages); }, [messages]);
+  useEffect(() => { dataService.persist('Notification', notifications); }, [notifications]);
+  useEffect(() => { dataService.persist('Task', tasks); }, [tasks]);
+  useEffect(() => { dataService.persist('Goal', goals); }, [goals]);
+  useEffect(() => { dataService.persist('Habit', habits); }, [habits]);
+  useEffect(() => { dataService.persist('StudySession', studySessions); }, [studySessions]);
+  useEffect(() => { dataService.persist('ActivityFeed', activityFeed); }, [activityFeed]);
 
   // Pomodoro Room Timer Interval Engine
   useEffect(() => {
@@ -2604,6 +2568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         showToast,
         removeToast,
+        loading,
       }}
     >
       {children}

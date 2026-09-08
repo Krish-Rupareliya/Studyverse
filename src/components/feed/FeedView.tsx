@@ -39,48 +39,7 @@ export const FeedView: React.FC<FeedViewProps> = ({ onNavigateProfile, onNavigat
   const { currentUser } = useAuth();
   const { activeRoom } = useApp();
 
-  const [posts, setPosts] = useState<FeedPost[]>([
-    {
-      id: 'post_1',
-      authorId: 'user_alex',
-      authorName: 'Alex Rivera',
-      authorUsername: 'alex_study',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      type: 'milestone',
-      content: 'Just completed a 5-day study streak and solved all LeetCode graph problem sets for CS61B! 🎉 Huge thanks to the study room crew for keeping the focus up!',
-      subject: 'Computer Science',
-      timestamp: Date.now() - 1000 * 60 * 45,
-      likes: ['user_bella', 'user_marcus'],
-      commentsCount: 3,
-    },
-    {
-      id: 'post_2',
-      authorId: 'user_bella',
-      authorName: 'Bella Chen',
-      authorUsername: 'bella_codes',
-      authorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-      type: 'study_buddy',
-      content: 'Looking for a study partner preparing for upcoming Data Structures midterms. Working on dynamic programming and recurrence trees in Room "CS61A Algorithms Sprint" right now!',
-      subject: 'Computer Science',
-      timestamp: Date.now() - 1000 * 60 * 120,
-      likes: ['user_alex'],
-      commentsCount: 2,
-      roomId: 'room_cs61a',
-    },
-    {
-      id: 'post_3',
-      authorId: 'user_marcus',
-      authorName: 'Marcus Vance',
-      authorUsername: 'marcus_med',
-      authorAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-      type: 'question',
-      content: 'Question for MCAT Biochemistry students: what is your best mnemonic for remembering enzyme kinetics and Michaelis-Menten constant (Km)?',
-      subject: 'Pre-Med / MCAT',
-      timestamp: Date.now() - 1000 * 60 * 240,
-      likes: [],
-      commentsCount: 5,
-    },
-  ]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
 
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<'milestone' | 'study_buddy' | 'question' | 'general'>('general');

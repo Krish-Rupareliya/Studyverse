@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 import http from "http";
@@ -275,22 +274,6 @@ wss.on("connection", (ws: WebSocket) => {
   });
 });
 
-// Lazy initialize Gemini AI client
-let aiClient: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI | null {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
-    aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return aiClient;
-}
-
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: Date.now() });
@@ -304,42 +287,18 @@ app.post("/api/gemini/summarize-notes", async (req, res) => {
       return res.status(400).json({ error: "Notes content is required." });
     }
 
-    const ai = getAI();
-    if (!ai) {
-      // Fallback summary if API key is not configured yet
-      return res.json({
-        summary: `Key takeaways on ${subject || "Study Topic"}:\n• Core concepts and definitions established.\n• Important formulas/rules highlighted.\n• Action items for next study session identified.`,
-        keyPoints: [
-          "Understanding foundational principles",
-          "Applying methodologies to practical examples",
-          "Reviewing frequent pitfalls and edge cases"
-        ],
-        actionItems: [
-          "Complete practice problem set",
-          "Review flashcards before next Pomodoro round"
-        ]
-      });
-    }
-
-    const prompt = `You are an elite academic study partner and tutor. 
-Subject: ${subject || "General Study"}
-Focus Topic: ${focusTopic || "Comprehensive Review"}
-
-Analyze and summarize the following study notes concisely in markdown format with:
-1. Executive Summary (2-3 sentences)
-2. Core Takeaways (bullet points)
-3. Mnemonics or Memory Anchors (if applicable)
-4. Recommended Next Steps / Practice Focus
-
-Study Notes:
-${notes}`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
+    return res.json({
+      summary: `Key takeaways on ${subject || "Study Topic"}:\n• Core concepts and definitions established.\n• Important formulas/rules highlighted.\n• Action items for next study session identified.`,
+      keyPoints: [
+        "Understanding foundational principles",
+        "Applying methodologies to practical examples",
+        "Reviewing frequent pitfalls and edge cases"
+      ],
+      actionItems: [
+        "Complete practice problem set",
+        "Review flashcards before next Pomodoro round"
+      ]
     });
-
-    res.json({ summary: response.text });
   } catch (error: any) {
     console.error("Error in summarize-notes:", error);
     res.status(500).json({ error: error.message || "Failed to summarize notes." });
@@ -349,40 +308,15 @@ ${notes}`;
 // AI Study Assistant: Generate Flashcards
 app.post("/api/gemini/generate-flashcards", async (req, res) => {
   try {
-    const { topic, notes, count = 5 } = req.body;
-    const ai = getAI();
+    const { topic } = req.body;
 
-    if (!ai) {
-      return res.json({
-        flashcards: [
-          { question: `What is the core definition of ${topic || "this topic"}?`, answer: "The fundamental principle governing this subject area.", difficulty: "easy" },
-          { question: "How does this concept apply in real-world problem solving?", answer: "By breaking complex workflows down into verifiable steps.", difficulty: "medium" },
-          { question: "What is a common pitfall or misconception to avoid?", answer: "Assuming linear scaling without verifying boundary constraints.", difficulty: "hard" },
-        ]
-      });
-    }
-
-    const prompt = `Generate ${count} high-yield active-recall study flashcards on the topic "${topic || "Study Notes"}".
-Notes context (if any): ${notes || "None provided"}
-
-Format the response as pure JSON with an array of objects with keys: "question", "answer", "difficulty" (one of "easy", "medium", "hard").`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
+    return res.json({
+      flashcards: [
+        { question: `What is the core definition of ${topic || "this topic"}?`, answer: "The fundamental principle governing this subject area.", difficulty: "easy" },
+        { question: "How does this concept apply in real-world problem solving?", answer: "By breaking complex workflows down into verifiable steps.", difficulty: "medium" },
+        { question: "What is a common pitfall or misconception to avoid?", answer: "Assuming linear scaling without verifying boundary constraints.", difficulty: "hard" },
+      ]
     });
-
-    let data;
-    try {
-      data = JSON.parse(response.text?.trim() || "[]");
-    } catch {
-      data = [];
-    }
-
-    res.json({ flashcards: Array.isArray(data) ? data : data.flashcards || [] });
   } catch (error: any) {
     console.error("Error in generate-flashcards:", error);
     res.status(500).json({ error: error.message || "Failed to generate flashcards." });
@@ -392,51 +326,18 @@ Format the response as pure JSON with an array of objects with keys: "question",
 // AI Study Assistant: Generate Practice Quiz
 app.post("/api/gemini/generate-quiz", async (req, res) => {
   try {
-    const { topic, notes, questionCount = 3 } = req.body;
-    const ai = getAI();
+    const { topic } = req.body;
 
-    if (!ai) {
-      return res.json({
-        quiz: [
-          {
-            question: `Which of the following is most essential to understanding ${topic || "this concept"}?`,
-            options: ["A) Consistent revision and spaced repetition", "B) Cramming the night before", "C) Skipping fundamental theorems", "D) Ignoring practice problems"],
-            correctAnswerIndex: 0,
-            explanation: "Spaced repetition provides superior neural retention compared to passive rereading."
-          }
-        ]
-      });
-    }
-
-    const prompt = `Generate ${questionCount} multiple choice practice quiz questions on the subject/topic: "${topic}".
-Context notes: ${notes || "General domain knowledge"}
-
-Return valid JSON with the format:
-[
-  {
-    "question": "Question text here?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correctAnswerIndex": 0,
-    "explanation": "Clear explanation why this is correct."
-  }
-]`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
+    return res.json({
+      quiz: [
+        {
+          question: `Which of the following is most essential to understanding ${topic || "this concept"}?`,
+          options: ["A) Consistent revision and spaced repetition", "B) Cramming the night before", "C) Skipping fundamental theorems", "D) Ignoring practice problems"],
+          correctAnswerIndex: 0,
+          explanation: "Spaced repetition provides superior neural retention compared to passive rereading."
+        }
+      ]
     });
-
-    let data;
-    try {
-      data = JSON.parse(response.text?.trim() || "[]");
-    } catch {
-      data = [];
-    }
-
-    res.json({ quiz: Array.isArray(data) ? data : data.quiz || [] });
   } catch (error: any) {
     console.error("Error in generate-quiz:", error);
     res.status(500).json({ error: error.message || "Failed to generate quiz." });
@@ -446,23 +347,11 @@ Return valid JSON with the format:
 // AI Study Assistant: Quick Concept Explainer
 app.post("/api/gemini/explain-concept", async (req, res) => {
   try {
-    const { concept, level = "college" } = req.body;
-    const ai = getAI();
+    const { concept } = req.body;
 
-    if (!ai) {
-      return res.json({
-        explanation: `Here is a clear breakdown of **${concept}**:\n\n1. **High-Level Intuition**: Think of this as a structured system for organizing complex interactions.\n2. **Mechanics**: It operates step-by-step to maintain state and accuracy.\n3. **Application**: Used widely across modern academic and professional problem solving.`
-      });
-    }
-
-    const prompt = `Explain the academic concept "${concept}" clearly for a ${level} student. Use the Feynman technique: intuitive analogy, rigorous definition, common real-world application, and 1 quick check-your-understanding question.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
+    return res.json({
+      explanation: `Here is a clear breakdown of **${concept}**:\n\n1. **High-Level Intuition**: Think of this as a structured system for organizing complex interactions.\n2. **Mechanics**: It operates step-by-step to maintain state and accuracy.\n3. **Application**: Used widely across modern academic and professional problem solving.`
     });
-
-    res.json({ explanation: response.text });
   } catch (error: any) {
     console.error("Error in explain-concept:", error);
     res.status(500).json({ error: error.message || "Failed to explain concept." });
@@ -472,29 +361,11 @@ app.post("/api/gemini/explain-concept", async (req, res) => {
 // AI Study Assistant: Generate Study Plan
 app.post("/api/gemini/study-plan", async (req, res) => {
   try {
-    const { targetGoal, examDate, availableHoursPerDay, subjects } = req.body;
-    const ai = getAI();
+    const { targetGoal, availableHoursPerDay } = req.body;
 
-    if (!ai) {
-      return res.json({
-        plan: `### 🎯 Targeted Study Plan for ${targetGoal || "Exam Prep"}\n\n- **Phase 1 (Foundation)**: Review core lecture notes & definitions (${availableHoursPerDay || 2}h/day).\n- **Phase 2 (Active Recall)**: Practice question sets and flashcards.\n- **Phase 3 (Mock Tests)**: Timed exam simulation with Pomodoro intervals.`
-      });
-    }
-
-    const prompt = `Create an optimized, structured study plan for a student:
-Target Goal: ${targetGoal}
-Subjects: ${JSON.stringify(subjects || [])}
-Exam/Deadline: ${examDate || "In 2 weeks"}
-Available Daily Study Time: ${availableHoursPerDay || 3} hours
-
-Provide actionable daily/weekly milestones, recommended Pomodoro breakdowns, and review cycles.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
+    return res.json({
+      plan: `### 🎯 Targeted Study Plan for ${targetGoal || "Exam Prep"}\n\n- **Phase 1 (Foundation)**: Review core lecture notes & definitions (${availableHoursPerDay || 2}h/day).\n- **Phase 2 (Active Recall)**: Practice question sets and flashcards.\n- **Phase 3 (Mock Tests)**: Timed exam simulation with Pomodoro intervals.`
     });
-
-    res.json({ plan: response.text });
   } catch (error: any) {
     console.error("Error in study-plan:", error);
     res.status(500).json({ error: error.message || "Failed to generate study plan." });
